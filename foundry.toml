@@ -1,0 +1,11 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+
+[invariant]
+fail_on_revert = true
+runs = 1000 #you can increase the runs for better result
+#depth = 23
+
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

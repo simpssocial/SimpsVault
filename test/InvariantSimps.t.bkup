@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity 0.8.20;
+
+import {Test, console2} from "forge-std/Test.sol";
+import {Simps} from "../src/Simps.sol";
+import {Handler} from "./handlers/Handler.sol";
+
+contract InvariantSimps is Test {
+    Simps public simps;
+    Handler public handler;
+    address simp = address(0x1);
+    address thot = address(0x2);
+
+    function setUp() public {
+        simps = new Simps();
+        handler = new Handler(simps);
+        vm.deal(simp, 10000 ether);
+        vm.deal(thot, 10000 ether);
+        vm.deal(address(handler), 10000 ether);
+
+        targetContract(address(handler));
+        // bytes4[] memory selectors = new bytes4[](1);
+
+    }
+
+    /*
+    function invariant_Buy() public {
+        uint256 supply = simps.sharesSupply(thot);
+        uint256 price = simps.getPriceQuadratic(supply, 1);
+        simps.buyShares{value: price}(thot, 1);
+        assertEq(simps.sharesBalance(thot, thot), 1);
+    }
+    */
+
+    function invariant_Buy() public {
+        assertGe(address(simps).balance, 0);
+
+        // uint256 supply = simps.sharesSupply(thot);
+        // uint256 price = simps.getPriceQuadratic(supply, 1);
+        
+        // simps.sellShares(thot, 1);
+        // assertEq(simps.sharesBalance(thot, thot), 1);
+        // uint256 simpsEthBalance = address(simps).balance;
+        // assertGt(simpsEthBalance, 0);
+    }
+
+    /*
+    function invariant_CheckSimpsBalance() public {
+        assert(address(simps).balance >= 0);
+    }
+    */
+
+}
+
+

@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.2;
+
+import "../../src/Simps.sol";
+import {Test, console2} from "forge-std/Test.sol";
+
+contract Handler is Test {
+    Simps simps;
+    uint256 public simpsBalance = 0;
+
+    constructor(Simps _simps) {
+        simps = _simps;
+    }
+
+    receive() external payable {}
+
+    /*
+    function buyShares(address sharesSubject, uint256 amount) public payable {
+
+        uint256 cost = simps.getPriceQuadratic(supply, amount);
+        console2.log('handler buyShares', sharesSubject, amount, address(this).balance);
+
+        simps.buyShares(sharesSubject, amount);
+    }
+    */
+
+    // function sellShares(address sharesSubject, uint256 amount) public virtual {
+
+    /*
+    function sellShares(address sharesSubject, uint256 amount) public virtual {
+        uint256 supply = simps.sharesSupply(sharesSubject);
+
+        if (supply == 0) {
+            uint256 price = simps.getPriceQuadratic(supply, amount);
+            simps.buyShares{value: price}(sharesSubject, amount);
+        }
+
+        // simps.sharesSupply[sharesSubject] = 10;
+        // uint256 supply = simps.sharesSupply(sharesSubject);
+        // sharesSubject = bound(sharesSubject, 2, 1e30);
+    }
+    */
+}
