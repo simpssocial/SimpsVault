@@ -116,6 +116,10 @@ abstract contract Ownable is Context {
     }
 }
 
+/**
+ * @title Simps
+ * @dev A contract for creating and managing rooms for trading shares with various curves.
+ */
 contract Simps is Ownable, Test {
     using FixedMath for int256;
 
@@ -134,7 +138,7 @@ contract Simps is Ownable, Test {
         Quadratic,
         Linear,
         Sigmoid,
-        FriendTech
+        Original
     }
 
     struct Room {
@@ -149,6 +153,15 @@ contract Simps is Ownable, Test {
 
     mapping(address subject => Room[] room) public rooms;
 
+    /**
+     * @dev Creates a new room for trading shares with the specified bonding curve.
+     * @param curve The curve type for price calculation.
+     * @param steepness The steepness parameter for the curve.
+     * @param floor The floor price for the shares.
+     * @param maxPrice The maximum price for the shares.
+     * @param currentLimit The current limit parameter for certain curves.
+     * @return The index of the created room.
+     */
     function createRoom(Curves curve, uint256 steepness, uint256 floor, uint256 maxPrice, int256 currentLimit) public returns (uint256) {
         require(steepness >= 1_000, "Invalid steepness value");
         require(steepness <= 10_000_000, "Invalid steepness value");
@@ -164,34 +177,72 @@ contract Simps is Ownable, Test {
         return rooms[msg.sender].length - 1;
     }
 
-    function getRoomsLength(address sharesSubject) public view returns (uint256) {
-        return rooms[sharesSubject].length;
-    }
-
+    /**
+     * @dev Sets the address where protocol fees will be sent.
+     * @param feeDestination The address to set as the fee destination.
+     */
     function setFeeDestination(address feeDestination) public onlyOwner {
         require(feeDestination != address(0), "Invalid address");
         protocolFeeDestination = feeDestination;
         emit FeeDestinationChanged(feeDestination);
     }
 
+    /**
+     * @dev Sets the percentage of protocol fees.
+     * @param feePercent The percentage of protocol fees to set.
+     */
     function setProtocolFeePercent(uint256 feePercent) public onlyOwner {
         protocolFeePercent = feePercent;
         emit ProtocolFeePercentChanged(feePercent);
     }
 
+    /**
+     * @dev Sets the percentage of subject fees.
+     * @param feePercent The percentage of subject fees to set.
+     */
     function setSubjectFeePercent(uint256 feePercent) public onlyOwner {
         subjectFeePercent = feePercent;
         emit SubjectFeePercentChanged(feePercent);
     }
 
+    /**
+     * @dev Gets the number of rooms for a given shares subject.
+     * @param sharesSubject The address of the shares subject.
+     * @return The number of rooms.
+     */
+    function getRoomsLength(address sharesSubject) public view returns (uint256) {
+        return rooms[sharesSubject].length;
+    }
+
+    /**
+     * @dev Gets the total supply of shares for a given room.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @return The total supply of shares.
+     */
     function getSharesSupply(address sharesSubject, uint256 roomNumber) public view returns (uint256) {
         return rooms[sharesSubject][roomNumber].sharesSupply;
     }
 
+    /**
+     * @dev Gets the balance of shares for a given holder in a specific room.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param holder The address of the shares holder.
+     * @return The balance of shares.
+     */
     function getSharesBalance(address sharesSubject, uint256 roomNumber, address holder) public view returns (uint256) {
         return rooms[sharesSubject][roomNumber].sharesBalance[holder];
     }
 
+    /**
+     * @dev Transfers shares from the sender to a recipient.
+     * @param recipient The address of the recipient.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param amount The amount of shares to transfer.
+     * @return A boolean indicating whether the transfer was successful.
+     */
     function transfer(address recipient, address sharesSubject, uint256 roomNumber, uint amount) external returns (bool) {
         require(rooms[sharesSubject][roomNumber].sharesBalance[msg.sender] >= amount, "Insufficient balance");
         require(recipient != address(0), "Invalid address");
@@ -201,12 +252,30 @@ contract Simps is Ownable, Test {
         return true;
     }
 
+    /**
+     * @dev Creates a new room for trading shares with the specified parameters and buys shares in that room.
+     * @param curve The curve type for price calculation.
+     * @param amount The amount of shares to buy.
+     * @param steepness The steepness parameter for the curve.
+     * @param floor The floor price for the shares.
+     * @param maxPrice The maximum price for the shares.
+     * @param currentLimit The current limit parameter for certain curves.
+     */
     function createRoomAndBuyShares(Curves curve, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 currentLimit) payable public {
         createRoom(curve, steepness, floor, maxPrice, currentLimit);
         buyShares(msg.sender, rooms[msg.sender].length - 1, amount);
     }
 
-    // sigmoid
+    /**
+     * @dev Calculates the price for a Sigmoid curve given the supply, amount, and curve parameters.
+     * @param supply The current supply of shares.
+     * @param amount The amount of shares to buy.
+     * @param steepness The steepness parameter for the curve.
+     * @param floor The floor price for the shares.
+     * @param maxPrice The maximum price for the shares.
+     * @param currentLimit The current limit parameter for certain curves.
+     * @return The total price for the shares.
+     */
     function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 currentLimit) public pure returns (uint256) {
         uint256 total = 0;
         for (uint256 i = 0; i < amount; i++) {
@@ -224,15 +293,27 @@ contract Simps is Ownable, Test {
         return total;
     }
 
-    // friend tech
-    function getPriceFriend(uint256 supply, uint256 amount) public pure returns (uint256) {
+    /**
+     * @dev Calculates the price for an original curve given the supply and amount of shares.
+     * @param supply The current supply of shares.
+     * @param amount The amount of shares to buy.
+     * @return The total price for the shares.
+     */
+    function getPriceOriginal(uint256 supply, uint256 amount) public pure returns (uint256) {
         uint256 sum1 = (supply - 1 ) * (supply) * (2 * (supply - 1) + 1) / 6; // 1/6 * (n - 1) * (n) * (2(n - 1) + 1) // 9 * 10 * 19 / 6 = 285 // 
         uint256 sum2 = (supply - 1 + amount) * (supply + amount) * (2 * (supply - 1 + amount) + 1) / 6; // 1/6 * (n - 1 + 1) * (n + 1) * (2(n - 1 + 1) + 1) = 10 * 11 * 21 / 6 = 385
         uint256 summation = sum2 - sum1;
         return summation * 1 ether / 16000;
     }
 
-    // quadratic
+    /**
+     * @dev Calculates the price for a quadratic curve given the supply, amount, steepness, and floor price.
+     * @param supply The current supply of shares.
+     * @param amount The amount of shares to buy.
+     * @param steepness The steepness parameter for the curve.
+     * @param floor The floor price for the shares.
+     * @return The total price for the shares.
+     */
     function getPriceQuadratic(uint256 supply, uint256 amount, uint256 steepness, uint256 floor) public pure returns (uint256) {
         uint256 sum1 = (supply - 1 ) * (supply) * (2 * (supply - 1) + 1) / 6;        
         uint256 sum2 = (supply - 1 + amount) * (supply + amount) * (2 * (supply - 1 + amount) + 1) / 6;
@@ -240,7 +321,14 @@ contract Simps is Ownable, Test {
         return summation * 1 ether / steepness + floor;
     }
 
-    // linear
+    /**
+     * @dev Calculates the price for a linear curve given the supply, amount, steepness, and floor price.
+     * @param supply The current supply of shares.
+     * @param amount The amount of shares to buy.
+     * @param steepness The steepness parameter for the curve.
+     * @param floor The floor price for the shares.
+     * @return The total price for the shares.
+     */
     function getPriceLinear(uint256 supply, uint256 amount, uint256 steepness, uint256 floor) public pure returns (uint256) {
         uint256 sum1 = (supply - 1) * supply;
         uint256 sum2 = (supply - 1 + amount) * (supply + amount);
@@ -248,6 +336,14 @@ contract Simps is Ownable, Test {
         return summation * 1 ether / (steepness / 500) + floor;
     }
 
+    /**
+     * @dev Calculates the price for buying or selling shares based on the specified parameters.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param amount The amount of shares to buy or sell.
+     * @param isBuy A boolean indicating whether the transaction is a buy or sell.
+     * @return The calculated price for the shares.
+     */
     function getPrice(address sharesSubject, uint256 roomNumber, uint256 amount, bool isBuy) view public returns (uint256 price) {
         Room storage r = rooms[sharesSubject][roomNumber];
         uint256 supply = isBuy ? r.sharesSupply : r.sharesSupply - amount;
@@ -257,8 +353,8 @@ contract Simps is Ownable, Test {
             return getPriceQuadratic(supply, amount, steepness, floor);
         } else if (rooms[sharesSubject][roomNumber].curve == Curves.Linear) {
             return getPriceLinear(supply, amount, steepness, floor);
-        } else if (rooms[sharesSubject][roomNumber].curve == Curves.FriendTech) {
-            return getPriceFriend(supply, amount);
+        } else if (rooms[sharesSubject][roomNumber].curve == Curves.Original) {
+            return getPriceOriginal(supply, amount);
         } else if (rooms[sharesSubject][roomNumber].curve == Curves.Sigmoid) {
             int256 currentLimit = r.currentLimit;
             uint256 maxPrice = r.maxPrice;
@@ -266,14 +362,35 @@ contract Simps is Ownable, Test {
         }
     }
 
+    /**
+     * @dev Calculates the buy price for shares based on the specified parameters.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param amount The amount of shares to buy.
+     * @return The calculated buy price for the shares.
+     */
     function getBuyPrice(address sharesSubject, uint256 roomNumber, uint256 amount) public view returns (uint256) {
         return getPrice(sharesSubject, roomNumber, amount, true);
     }
 
+    /**
+     * @dev Calculates the sell price for shares based on the specified parameters.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param amount The amount of shares to sell.
+     * @return The calculated sell price for the shares.
+     */
     function getSellPrice(address sharesSubject, uint256 roomNumber, uint256 amount) public view returns (uint256) {
         return getPrice(sharesSubject, roomNumber, amount, false);
     }
 
+    /**
+     * @dev Calculates the buy price for shares after applying protocol and subject fees.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param amount The amount of shares to buy.
+     * @return The calculated buy price for the shares after fees.
+     */    
     function getBuyPriceAfterFee(address sharesSubject, uint256 roomNumber, uint256 amount) public view returns (uint256) {
         uint256 price = getBuyPrice(sharesSubject, roomNumber, amount);
         uint256 protocolFee = price * protocolFeePercent / 1 ether;
@@ -281,6 +398,13 @@ contract Simps is Ownable, Test {
         return price + protocolFee + subjectFee;
     }
 
+    /**
+     * @dev Calculates the sell price for shares after applying protocol and subject fees.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param amount The amount of shares to sell.
+     * @return The calculated sell price for the shares after fees.
+     */
     function getSellPriceAfterFee(address sharesSubject, uint256 roomNumber, uint256 amount) public view returns (uint256) {
         uint256 price = getSellPrice(sharesSubject, roomNumber, amount);
         uint256 protocolFee = price * protocolFeePercent / 1 ether;
@@ -288,12 +412,18 @@ contract Simps is Ownable, Test {
         return price - protocolFee - subjectFee;
     }
 
+    /**
+     * @dev Allows a user to buy shares.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param amount The amount of shares to buy.
+     */
     function buyShares(address sharesSubject, uint256 roomNumber, uint256 amount) public payable {
         require(amount > 0, "Invalid amount");
         require(rooms[sharesSubject][roomNumber].sharesSupply > 0, "Invalid room");
         require(sharesSubject != address(0), "Invalid address");
 
-        require(supply > 0 || sharesSubject == msg.sender, "Only the shares' subject can buy the first share");
+        // require(supply > 0 || sharesSubject == msg.sender, "Only the shares' subject can buy the first share");
 
         uint256 supply = rooms[sharesSubject][roomNumber].sharesSupply;
         uint256 price = getPrice(sharesSubject, roomNumber, amount, true);
@@ -313,6 +443,12 @@ contract Simps is Ownable, Test {
         require(success1 && success2, "Unable to send funds");
     }
 
+    /**
+     * @dev Allows a user to sell shares.
+     * @param sharesSubject The address of the shares subject.
+     * @param roomNumber The index of the room.
+     * @param amount The amount of shares to sell.
+     */
     function sellShares(address sharesSubject, uint256 roomNumber, uint256 amount) public payable {
         uint256 supply = rooms[sharesSubject][roomNumber].sharesSupply;
         uint256 price = getPrice(sharesSubject, roomNumber, amount, false);

@@ -20,6 +20,12 @@ contract SimpsTest is Test {
         simps.setSubjectFeePercent(50000000000000000);        
     }
 
+    function test_BuyRoomInvalid() public {
+        simps.createRoom(Simps.Curves.Quadratic, 16000, 1, 0, 0);
+        uint256 length = simps.getRoomsLength(address(this));
+        assertEq(length, 1);
+    }
+
     function test_SimpsCreateRoomQuadratic() public {
         simps.createRoom(Simps.Curves.Quadratic, 16000, 1, 0, 0);
         uint256 length = simps.getRoomsLength(address(this));
