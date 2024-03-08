@@ -1,126 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity 0.8.18;
-
-import {Test, console2} from "forge-std/Test.sol";
+pragma solidity ^0.8.20;
 
 import {FixedMath} from "./FixedMath.sol";
 
-// forge create FixedMath --rpc-url=$RPC_URL --private-key=$PRIVATE_KEY
-// forge create Simps --rpc-url=$RPC_URL --private-key=$PRIVATE_KEY --libraries src/FixedMath.sol:FixedMath:0x5fbdb2315678afecb367f032d93f642f64180aa3
-// /System/Volumes/Data/Users/michaelreilly/Library/Python/3.9/bin/slither
-
-/**
- * @dev Provides information about the current execution context, including the
- * sender of the transaction and its data. While these are generally available
- * via msg.sender and msg.data, they should not be accessed in such a direct
- * manner, since when dealing with meta-transactions the account sending and
- * paying for execution may not be the actual sender (as far as an application
- * is concerned).
- *
- * This contract is only required for intermediate, library-like contracts.
- */
-abstract contract Context {
-    function _msgSender() internal view virtual returns (address) {
-        return msg.sender;
-    }
-
-    /*
-    function _msgData() internal view virtual returns (bytes calldata) {
-        return msg.data;
-    }
-    */
-}
-
-// File: contracts/Ownable.sol
-
-
-// OpenZeppelin Contracts (last updated v4.7.0) (access/Ownable.sol)
-
-// pragma solidity ^0.8.0;
-
-
-/**
- * @dev Contract module which provides a basic access control mechanism, where
- * there is an account (an owner) that can be granted exclusive access to
- * specific functions.
- *
- * By default, the owner account will be the one that deploys the contract. This
- * can later be changed with {transferOwnership}.
- *
- * This module is used through inheritance. It will make available the modifier
- * `onlyOwner`, which can be applied to your functions to restrict their use to
- * the owner.
- */
-abstract contract Ownable is Context {
-    address private _owner;
-
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
-
-    /**
-     * @dev Initializes the contract setting the deployer as the initial owner.
-     */
-    constructor() {
-        _transferOwnership(_msgSender());
-    }
-
-    /**
-     * @dev Throws if called by any account other than the owner.
-     */
-    modifier onlyOwner() {
-        _checkOwner();
-        _;
-    }
-
-    /**
-     * @dev Returns the address of the current owner.
-     */
-    function owner() public view virtual returns (address) {
-        return _owner;
-    }
-
-    /**
-     * @dev Throws if the sender is not the owner.
-     */
-    function _checkOwner() internal view virtual {
-        require(owner() == _msgSender(), "Ownable: caller is not the owner");
-    }
-
-    /**
-     * @dev Leaves the contract without owner. It will not be possible to call
-     * `onlyOwner` functions anymore. Can only be called by the current owner.
-     *
-     * NOTE: Renouncing ownership will leave the contract without an owner,
-     * thereby removing any functionality that is only available to the owner.
-     */
-    function renounceOwnership() public virtual onlyOwner {
-        _transferOwnership(address(0));
-    }
-
-    /**
-     * @dev Transfers ownership of the contract to a new account (`newOwner`).
-     * Can only be called by the current owner.
-     */
-    function transferOwnership(address newOwner) public virtual onlyOwner {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
-        _transferOwnership(newOwner);
-    }
-
-    /**
-     * @dev Transfers ownership of the contract to a new account (`newOwner`).
-     * Internal function without access restriction.
-     */
-    function _transferOwnership(address newOwner) internal virtual {
-        address oldOwner = _owner;
-        _owner = newOwner;
-        emit OwnershipTransferred(oldOwner, newOwner);
-    }
-}
+import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
+import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 /**
  * @title Simps
  * @dev A contract for creating and managing rooms for trading shares with various curves.
  */
-contract Simps is Ownable, Test {
+contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     using FixedMath for int256;
 
     address public protocolFeeDestination;
@@ -144,7 +35,7 @@ contract Simps is Ownable, Test {
     struct Room {
         Curves curve;
         uint256 floor;
-        int256 currentLimit;
+        int256 midPoint;
         uint256 maxPrice;
         uint256 steepness;
         uint256 sharesSupply;
@@ -153,16 +44,40 @@ contract Simps is Ownable, Test {
 
     mapping(address subject => Room[] room) public rooms;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @dev Initializes the contract.
+     * @param initialOwner The address to be set as the initial owner.
+     */
+    function initialize(address initialOwner) public initializer {
+        __Ownable_init(initialOwner);
+        __UUPSUpgradeable_init();
+    }
+
+    /**
+     * @dev Checks whether the upgrade is authorized.
+     * @param newImplementation The address of the new implementation.
+     */
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        onlyOwner
+        override
+    {}
+
     /**
      * @dev Creates a new room for trading shares with the specified bonding curve.
      * @param curve The curve type for price calculation.
      * @param steepness The steepness parameter for the curve.
      * @param floor The floor price for the shares.
      * @param maxPrice The maximum price for the shares.
-     * @param currentLimit The current limit parameter for certain curves.
-     * @return The index of the created room.
+     * @param midPoint The mid point of the sigmoid curve.
+     * @return room The index of the created room.
      */
-    function createRoom(Curves curve, uint256 steepness, uint256 floor, uint256 maxPrice, int256 currentLimit) public returns (uint256) {
+    function createRoom(Curves curve, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public returns (uint256 room) {
         require(steepness >= 1_000, "Invalid steepness value");
         require(steepness <= 10_000_000, "Invalid steepness value");
         Room storage r = rooms[msg.sender].push();
@@ -170,7 +85,7 @@ contract Simps is Ownable, Test {
         r.steepness = steepness;
         r.sharesSupply = 1;
         r.floor = floor;
-        r.currentLimit = currentLimit;
+        r.midPoint = midPoint;
         r.maxPrice = maxPrice;
         r.sharesBalance[msg.sender] = 1;
         emit CreatedRoom(msg.sender, rooms[msg.sender].length, steepness);
@@ -259,11 +174,13 @@ contract Simps is Ownable, Test {
      * @param steepness The steepness parameter for the curve.
      * @param floor The floor price for the shares.
      * @param maxPrice The maximum price for the shares.
-     * @param currentLimit The current limit parameter for certain curves.
+     * @param midPoint The mid point of the sigmoid curve.
+     * @return room The index of the created room.
      */
-    function createRoomAndBuyShares(Curves curve, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 currentLimit) payable public {
-        createRoom(curve, steepness, floor, maxPrice, currentLimit);
-        buyShares(msg.sender, rooms[msg.sender].length - 1, amount);
+    function createRoomAndBuyShares(Curves curve, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) payable public returns (uint256 room) {
+        uint256 roomIndex = createRoom(curve, steepness, floor, maxPrice, midPoint);
+        buyShares(msg.sender, roomIndex, amount);
+        return roomIndex;
     }
 
     /**
@@ -273,14 +190,13 @@ contract Simps is Ownable, Test {
      * @param steepness The steepness parameter for the curve.
      * @param floor The floor price for the shares.
      * @param maxPrice The maximum price for the shares.
-     * @param currentLimit The current limit parameter for certain curves.
+     * @param midPoint The mid point of the sigmoid curve.
      * @return price The total price for the shares.
      */
-    function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 currentLimit) public pure returns (uint256 price) {
+    function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public pure returns (uint256 price) {
         uint256 total = 0;
         for (uint256 i = 0; i < amount; i++) {
-            int256 midpoint = currentLimit;
-            int256 numerator = int256(supply + i) - midpoint;
+            int256 numerator = int256(supply + i) - midPoint;
             int256 innerSqrt = (int256(steepness) + (numerator)**2);
             int256 fixedInner = innerSqrt.toFixed();
             int256 fixedDenominator = fixedInner.sqrt();
@@ -356,9 +272,9 @@ contract Simps is Ownable, Test {
         } else if (rooms[sharesSubject][roomNumber].curve == Curves.Original) {
             return getPriceOriginal(supply, amount);
         } else if (rooms[sharesSubject][roomNumber].curve == Curves.Sigmoid) {
-            int256 currentLimit = r.currentLimit;
+            int256 midPoint = r.midPoint;
             uint256 maxPrice = r.maxPrice;
-            return getPriceSigmoid(supply, amount, steepness, floor, maxPrice, currentLimit);
+            return getPriceSigmoid(supply, amount, steepness, floor, maxPrice, midPoint);
         }
     }
 
@@ -423,8 +339,6 @@ contract Simps is Ownable, Test {
         require(rooms[sharesSubject][roomNumber].sharesSupply > 0, "Invalid room");
         require(sharesSubject != address(0), "Invalid address");
 
-        // require(supply > 0 || sharesSubject == msg.sender, "Only the shares' subject can buy the first share");
-
         uint256 supply = rooms[sharesSubject][roomNumber].sharesSupply;
         uint256 price = getPrice(sharesSubject, roomNumber, amount, true);
 
@@ -451,12 +365,13 @@ contract Simps is Ownable, Test {
      */
     function sellShares(address sharesSubject, uint256 roomNumber, uint256 amount) public payable {
         uint256 supply = rooms[sharesSubject][roomNumber].sharesSupply;
+        require(supply > amount, "Cannot sell the last share");
+        require(rooms[sharesSubject][roomNumber].sharesBalance[msg.sender] >= amount, "Insufficient shares");
+
         uint256 price = getPrice(sharesSubject, roomNumber, amount, false);
 
         uint256 protocolFee = price * protocolFeePercent / 1 ether;
         uint256 subjectFee = price * subjectFeePercent / 1 ether;
-
-        require(rooms[sharesSubject][roomNumber].sharesBalance[msg.sender] >= amount, "Insufficient shares");
 
         rooms[sharesSubject][roomNumber].sharesBalance[msg.sender] = rooms[sharesSubject][roomNumber].sharesBalance[msg.sender] - amount;
         rooms[sharesSubject][roomNumber].sharesSupply = supply - amount;
