@@ -7,6 +7,8 @@ import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.s
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 
+import "forge-std/console.sol";
+
 /**
  * @title Simps
  * @dev A contract for creating and managing rooms for trading shares with various curves.
@@ -193,18 +195,18 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @param midPoint The mid point of the sigmoid curve.
      * @return price The total price for the shares.
      */
-    function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public pure returns (uint256 price) {
+function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public pure returns (uint256 price) {
         uint256 total = 0;
         for (uint256 i = 0; i < amount; i++) {
-            int256 numerator = int256(supply + i) - midPoint;
-            int256 innerSqrt = (int256(steepness) + (numerator)**2);
+            int256 numerator = int256(supply + i) - midPoint; // n = (supply + i) - midPoint
+            int256 innerSqrt = (int256(steepness) + (numerator)**2); // s + n^2
             int256 fixedInner = innerSqrt.toFixed();
-            int256 fixedDenominator = fixedInner.sqrt();
+            int256 fixedDenominator = fixedInner.sqrt(); // d = sqrt(s + n^2)
             int256 fixedNumerator = numerator.toFixed();
-            int256 midVal = fixedNumerator.divide(fixedDenominator) + FixedMath.fixed1();
+            int256 midVal = fixedNumerator.divide(fixedDenominator) + FixedMath.fixed1(); // midVal = n/d + 1
             int256 fixedFinal = (int256(maxPrice) * 1_000_000) / 2 * midVal;
             int256 finalVal = fixedFinal / 1_000_000_000_000 ether;
-            total += uint256(finalVal) + floor;
+            total += uint256(finalVal) + floor; // can optimize by moving floor out of loop as total + floor * amount
         }
         return total;
     }
@@ -364,6 +366,7 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @param amount The amount of shares to sell.
      */
     function sellShares(address sharesSubject, uint256 roomNumber, uint256 amount) public payable {
+        // require(amount > 0, "NO AMOUNT");
         uint256 supply = rooms[sharesSubject][roomNumber].sharesSupply;
         require(supply > amount, "Cannot sell the last share");
         require(rooms[sharesSubject][roomNumber].sharesBalance[msg.sender] >= amount, "Insufficient shares");
@@ -378,9 +381,11 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
 
         emit Trade(msg.sender, sharesSubject, false, amount, price, protocolFee, subjectFee, supply - amount);
 
+        console.log("price: %s, protocolFee: %s, subjectFee: %s", price, protocolFee, subjectFee);
         (bool success1, ) = msg.sender.call{value: price - protocolFee - subjectFee}("");
         (bool success2, ) = protocolFeeDestination.call{value: protocolFee}("");
         (bool success3, ) = sharesSubject.call{value: subjectFee}("");
+        console.log("success1: %s, success2: %s, success3: %s", success1, success2, success3);
         require(success1 && success2 && success3, "Unable to send funds");
     }
 
