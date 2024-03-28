@@ -340,6 +340,11 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
         (bool success1, ) = protocolFeeDestination.call{value: protocolFee}("");
         (bool success2, ) = sharesSubject.call{value: subjectFee}("");
         require(success1 && success2, "Unable to send funds");
+
+        if (msg.value > price + protocolFee + subjectFee) {
+            (bool success3, ) = msg.sender.call{value: msg.value - price - protocolFee - subjectFee}("");
+            require(success3, "Unable to send funds");
+        }
     }
 
     /**
