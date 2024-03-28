@@ -28,8 +28,7 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
     enum Curves {
         Quadratic,
         Linear,
-        Sigmoid,
-        Original
+        Sigmoid
     }
 
     struct Room {
@@ -78,6 +77,7 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @return room The index of the created room.
      */
     function createRoom(Curves curve, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public returns (uint256 room) {
+        require(msg.sender == tx.origin, "Invalid sender");
         require(steepness >= 1_000, "Invalid steepness value");
         require(steepness <= 10_000_000, "Invalid steepness value");
         Room storage r = rooms[msg.sender].push();
@@ -107,6 +107,7 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @param feePercent The percentage of protocol fees to set.
      */
     function setProtocolFeePercent(uint256 feePercent) public onlyOwner {
+        require(feePercent <= 500000000000000000, "Invalid fee percent"); // max 50%
         protocolFeePercent = feePercent;
         emit ProtocolFeePercentChanged(feePercent);
     }
@@ -116,6 +117,7 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @param feePercent The percentage of subject fees to set.
      */
     function setSubjectFeePercent(uint256 feePercent) public onlyOwner {
+        require(feePercent <= 500000000000000000, "Invalid fee percent"); // max 50%
         subjectFeePercent = feePercent;
         emit SubjectFeePercentChanged(feePercent);
     }
@@ -195,31 +197,16 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      */
     function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public pure returns (uint256 price) {
         uint256 total = 0;
-        for (uint256 i = 0; i < amount; i++) {
-            int256 numerator = int256(supply + i) - midPoint;
-            int256 innerSqrt = (int256(steepness) + (numerator)**2);
-            int256 fixedInner = innerSqrt.toFixed();
-            int256 fixedDenominator = fixedInner.sqrt();
-            int256 fixedNumerator = numerator.toFixed();
-            int256 midVal = fixedNumerator.divide(fixedDenominator) + FixedMath.fixed1();
-            int256 fixedFinal = (int256(maxPrice) * 1_000_000) / 2 * midVal;
-            int256 finalVal = fixedFinal / 1_000_000_000_000 ether;
-            total += uint256(finalVal) + floor;
-        }
+        int256 numerator = int256(supply + amount) - midPoint;
+        int256 innerSqrt = (int256(steepness) + (numerator)**2);
+        int256 fixedInner = innerSqrt.toFixed();
+        int256 fixedDenominator = fixedInner.sqrt();
+        int256 fixedNumerator = numerator.toFixed();
+        int256 midVal = fixedNumerator.divide(fixedDenominator) + FixedMath.fixed1();
+        int256 fixedFinal = (int256(maxPrice) * 1_000_000) / 2 * midVal;
+        int256 finalVal = fixedFinal / 1_000_000_000_000 ether;
+        total += uint256(finalVal) + floor;
         return total;
-    }
-
-    /**
-     * @dev Calculates the price for an original curve given the supply and amount of shares.
-     * @param supply The current supply of shares.
-     * @param amount The amount of shares to buy.
-     * @return price The total price for the shares.
-     */
-    function getPriceOriginal(uint256 supply, uint256 amount) public pure returns (uint256 price) {
-        uint256 sum1 = (supply - 1 ) * (supply) * (2 * (supply - 1) + 1) / 6; // 1/6 * (n - 1) * (n) * (2(n - 1) + 1) // 9 * 10 * 19 / 6 = 285 // 
-        uint256 sum2 = (supply - 1 + amount) * (supply + amount) * (2 * (supply - 1 + amount) + 1) / 6; // 1/6 * (n - 1 + 1) * (n + 1) * (2(n - 1 + 1) + 1) = 10 * 11 * 21 / 6 = 385
-        uint256 summation = sum2 - sum1;
-        return summation * 1 ether / 16000;
     }
 
     /**
@@ -269,8 +256,6 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
             return getPriceQuadratic(supply, amount, steepness, floor);
         } else if (rooms[sharesSubject][roomNumber].curve == Curves.Linear) {
             return getPriceLinear(supply, amount, steepness, floor);
-        } else if (rooms[sharesSubject][roomNumber].curve == Curves.Original) {
-            return getPriceOriginal(supply, amount);
         } else if (rooms[sharesSubject][roomNumber].curve == Curves.Sigmoid) {
             int256 midPoint = r.midPoint;
             uint256 maxPrice = r.maxPrice;
@@ -364,6 +349,7 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @param amount The amount of shares to sell.
      */
     function sellShares(address sharesSubject, uint256 roomNumber, uint256 amount) public payable {
+        require(amount > 0, "Invalid amount");
         uint256 supply = rooms[sharesSubject][roomNumber].sharesSupply;
         require(supply > amount, "Cannot sell the last share");
         require(rooms[sharesSubject][roomNumber].sharesBalance[msg.sender] >= amount, "Insufficient shares");

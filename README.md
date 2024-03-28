@@ -28,3 +28,14 @@ $ forge script script/DeployVault.s.sol --broadcast --rpc-url=$RPC_URL --private
 $ forge script script/DeployProxy.s.sol --broadcast --rpc-url=$RPC_URL --private-key=$PRIVATE_KEY
 ```
 
+### Audit bugs
+
+[x] Sell 0 share for price of balance in contract
+[x] Remove SimpsToken test
+[ ] createRoom can be optimized
+[ ] refund excess ether in buyShares
+[x] reentrancy in buyShares and Sell shares
+[x] Sigmoid has for-loop on user input amount
+[x] no limit on setting fees, can accidentaly set bad values
+[ ] recommended to check if fees resulted in 0 before making transfer calls
+[x] remove getPriceOriginal. Same as getPriceQuadratic with steepness = 16000 and floor = 0

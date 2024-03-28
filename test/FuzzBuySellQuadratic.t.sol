@@ -32,11 +32,11 @@ contract FuzzBuySellQuadratic is Test {
     /// @dev Tests the creation of a quadratic room, loop buying shares, and loop selling
     function test_fuzzLoopBuyLoopSellSharesQuadratic(uint256 amount) public {
         amount = bound(amount, 1, 1000);
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         uint256 room = simps.createRoom(SimpsVault.Curves.Quadratic, 16000, 1, 0, 0);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
 
         // loop buy shares
         for (uint256 i = 0; i < amount; i++) {
@@ -72,12 +72,12 @@ contract FuzzBuySellQuadratic is Test {
     function test_fuzzLoopBuyBatchSellSharesQuadratic(uint256 amount) public {
         amount = bound(amount, 1, 1000);
 
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         // create room
         uint256 room = simps.createRoom(SimpsVault.Curves.Quadratic, 16000, 0, 0, 0);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
 
         // loop buy shares
         for (uint256 i = 0; i < amount; i++) {
@@ -107,12 +107,12 @@ contract FuzzBuySellQuadratic is Test {
     function test_fuzzBatchBuyLoopSellSharesQuadratic(uint256 amount) public {
         amount = bound(amount, 1, 1000);
 
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         // create room
         uint256 room = simps.createRoom(SimpsVault.Curves.Quadratic, 16000, 0, 0, 0);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
 
         // batch buy shares
         uint256 price = simps.getBuyPriceAfterFee(simp1, room, amount); 

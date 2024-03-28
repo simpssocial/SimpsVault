@@ -5,6 +5,9 @@ libs = ["lib"]
 build_info = true
 extra_output = ["storageLayout"]
 
+sender = '0x9dF0C6b0066D5317aA5b38B36850548DaCCa6B4e'
+tx_origin = '0x9dF0C6b0066D5317aA5b38B36850548DaCCa6B4e'
+
 [invariant]
 fail_on_revert = true
 runs = 1000 #you can increase the runs for better result

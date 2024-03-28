@@ -34,11 +34,11 @@ contract FuzzBuySellLinear is Test {
         amount = bound(amount, 1, 1000);
         steepness = bound(steepness, 1_000, 10_000_001);
 
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         uint256 room = simps.createRoom(SimpsVault.Curves.Linear, 16000, 1, 0, 0);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
 
         // loop buy shares
         for (uint256 i = 0; i < amount; i++) {
@@ -75,12 +75,12 @@ contract FuzzBuySellLinear is Test {
         amount = bound(amount, 1, 1000);
         steepness = bound(steepness, 1000, 100000);
 
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         // create room
         uint256 room = simps.createRoom(SimpsVault.Curves.Linear, 16000, 0, 0, 0);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
 
         // loop buy shares
         for (uint256 i = 0; i < amount; i++) {
@@ -111,12 +111,12 @@ contract FuzzBuySellLinear is Test {
         amount = bound(amount, 1, 1000);
         steepness = bound(steepness, 1000, 100000);
 
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         // create room
         uint256 room = simps.createRoom(SimpsVault.Curves.Linear, 16000, 0, 0, 0);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
 
         // batch buy shares
         uint256 price = simps.getBuyPriceAfterFee(simp1, room, amount); 

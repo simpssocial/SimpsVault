@@ -32,7 +32,7 @@ contract FuzzTest is Test {
     //// @dev Tests the creation of a quadratic room and buying shares in one function
     function test_fuzzSimpsCreateRoomQuadraticAndBuyShare(uint256 amount) public {
         amount = bound(amount, 1, 10_000);
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
 
         uint256 supply = 1;
         uint256 steepness = 16000;
@@ -61,7 +61,7 @@ contract FuzzTest is Test {
     //// @dev Tests the creation of a quadratic room and buying shares in one function
     function test_fuzzSimpsCreateRoomLinearAndBuyShare(uint256 amount) public {
         amount = bound(amount, 1, 10_000);
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
 
         uint256 supply = 1;
         uint256 steepness = 16000;
@@ -87,39 +87,10 @@ contract FuzzTest is Test {
         vm.stopPrank();
     }
 
-    //// @dev Tests the creation of a original room and buying shares in one function
-    function test_fuzzSimpsCreateRoomOriginalAndBuyShare(uint256 amount) public {
-        amount = bound(amount, 1, 10_000);
-        vm.startPrank(simp1);
-
-        uint256 supply = 1;
-        uint256 steepness = 16000;
-        uint256 floor = 0;
-        int256 midPoint = 0;
-        uint256 maxPrice = 0;
-
-        uint256 price = simps.getPriceOriginal(supply, amount);
-
-        uint256 protocolFee = price * 50000000000000000 / 1 ether;
-        uint256 subjectFee = price * 50000000000000000 / 1 ether;
-
-        uint256 room = simps.createRoomAndBuyShares{value: price + protocolFee + subjectFee}(SimpsVault.Curves.Original, amount, steepness, floor, maxPrice, midPoint);
-
-        // check room was created
-        uint256 length = simps.getRoomsLength(address(simp1));
-        assertEq(length, 1);
-
-        // check shares balance
-        uint256 balance = simps.getSharesBalance(simp1, room, simp1);
-        assertEq(balance, amount + 1);
-
-        vm.stopPrank();
-    }
-
     //// @dev Tests the creation of a sigmoid room and buying shares in one function
     function test_fuzzSimpsCreateRoomSigmoidAndBuyShare(uint256 amount) public {
         amount = bound(amount, 1, 200);
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
 
         uint256 supply = 1;
         uint256 steepness = 16000;
@@ -148,11 +119,11 @@ contract FuzzTest is Test {
     //// @dev Tests the creation of a linear room, buying share, and selling share
     function test_fuzzLinearBuySell(uint256 amount) public {
         amount = bound(amount, 1, 10_000);
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         uint256 room = simps.createRoom(SimpsVault.Curves.Linear, 1600, 1, 0.1 ether, 1000);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
         uint256 price = simps.getBuyPriceAfterFee(simp1, room, amount);
         simps.buyShares{value: price}(simp1, room, amount);
 
@@ -173,11 +144,11 @@ contract FuzzTest is Test {
     function test_fuzzQuadraticBuySell(uint256 amount) public {
         amount = bound(amount, 1, 10_000);
 
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         uint256 room = simps.createRoom(SimpsVault.Curves.Quadratic, 1600, 1, 0.4 ether, 1000);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
         uint256 price = simps.getBuyPriceAfterFee(simp1, room, amount);
         simps.buyShares{value: price}(simp1, room, amount);
 
@@ -198,11 +169,11 @@ contract FuzzTest is Test {
     function test_fuzzSigmoidBuySell(uint256 amount) public {
         amount = bound(amount, 1, 10);
 
-        vm.startPrank(simp1);
+        vm.startPrank(simp1, simp1);
         uint256 room = simps.createRoom(SimpsVault.Curves.Sigmoid, 1600, 1, 0.5 ether, 10000);
         vm.stopPrank();
 
-        vm.startPrank(simp2);
+        vm.startPrank(simp2, simp2);
         uint256 price = simps.getBuyPriceAfterFee(simp1, room, amount);
         simps.buyShares{value: price}(simp1, room, amount);
 
