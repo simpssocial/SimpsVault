@@ -1,4 +1,10 @@
-# Audit
+# SimpSocial Audit
+
+**Repo:** https://github.com/simpssocial/SimpsVault/tree/master
+
+**Commit:** [2b51fae011a8287bb8e6c1673684064bbb3e8989](https://github.com/simpssocial/SimpsVault/blob/2b51fae011a8287bb8e6c1673684064bbb3e8989)
+
+**Findings:** 1 CRITICAL, 1 MEDIUM, 4 LOW, 2 GAS OPTIMIZATIONS, 3 INFORMATIONAL
 
 ## [CRITICAL-01] it is possible to sell nothing for everything
 
@@ -14,7 +20,7 @@ where summation is the quadratic supply delta and `floor` is initialized by crea
 when selling `amount = 0` then `summation = 0`, leading to return `floor` from `getPriceLinear` and `getPriceQuadratic`.
 since `floor` is controlled by the room creator, an attacker can create a room with `floor = address(simps).balance` and sell 0 shares, resulting in sell price of the entire balance.
 
-PoC:
+**PoC:**
 
 ```solidity
 /// @dev Test selling zero amount of shares does not transfer any funds since quadratic curve results in floor price
@@ -37,67 +43,95 @@ function test_SellZeroQuadratic() public {
 }
 ```
 
-### Remediation
+**Recommendation:**
 
-`require(amount > 0)` in `sellShares` and/or in `getPriceLinear`, `getPriceQuadratic`.
+add `require(amount > 0)` in `sellShares` and/or in `getPriceLinear`, `getPriceQuadratic`.
 
 perhaps consider removing floor price altogether.
 
-### SimpsToken.sol does not exist
 
-this file is referenced in `test/Token.t.sol` but does not exist in git.
+## [MEDIUM-01] excess ether transferred cannot be recovered
 
-### createRoom can be optimized
+If someone overpays for shares they are not refunded. Considering these funds are locked forever I consider this to have medium impact.
 
-also Room struct does not require midPoint, maxPrice for all curves, as well as floor and even steepness
+**Recommendation:**
 
-# buyShares do not refund excess ether transferred
+Refund excess funds.
 
-if someone overpays they are not refunded.
-it is recommended to refund remainder or limit slippage
 
-## there is reentrancy in buyShares & sellShares
+## [LOW-01] You get 1 free share when creating a room
 
-`(bool success2, ) = sharesSubject.call{value: subjectFee}("");`
-since sharesSubject is user controlled address
+If someone buys at least 1 extra share after someone creates a room:
 
-### Remediation
+1. the room creator can sell their free share for that current market price.
+2. that last share cannot be sold.
 
-in `createRoom` check:
-`require(msg.sender == tx.sender)`
-or
+**Recommendation:**
+
+Either charge the floor price when creating a room, prevent owner from selling their last share, or simply set `totalSupply = 1` without attributing that share to anyone.
+
+
+## [LOW-02] attackers can exhaust traders gas
+
+Since `sharesSubject` is controlled by room creators, an attacker can create a contract if contracts are allowed to call `createRoom`, this call could consume arbitrary gas from users.
+
+**Recommendation:**
+
+`require(msg.sender == tx.origin)`
+
+or:
+
 `require(!isContract(msg.sender))`
 
 
-### Sigmoid has for-loop on user input amount
+## [LOW-03] There is o limit on setting fees
 
-the for body contains sqrt (which also has a loop)
-making it increasingly difficult and expensive to buy shares as amount grows
+Admin can accidentaly set bad values.
 
+**Recommendation:**
 
-### no limit on setting fees, can accidentaly set bad values
-
-also it is recommended to check if fees resulted in 0 before making transfer calls
+Check fee values are within reasonable range.
 
 
-### when isBuy = true in getPrice and sharesSupply is 0...
+### [LOW-04] Sigmoid curve has quadratic complexity
+
+The sigmoid curve is implemented via a for-loop that calculates the price for each share bought. The for-loop body contains a sqrt calculation which itself also contains a loop, making the calculation quadratic.
+
+This is making it increasingly difficult and expensive to buy shares as amount grows and makes price 
 
 
-### getPriceOriginal is subset of getPriceQuadratic
+### [GAS-OPT-01] No need to check sharesSubject against zero address
+
+In `buyShares`, since this check exists:
+
+```solidity
+require(rooms[sharesSubject][roomNumber].sharesSupply > 0, "Invalid room");
+```
+
+and only `msg.sender` can create rooms, then it is guaranteed `sharesSubject` is not `address(0)`
+
+
+### [GAS-OPT-02] createRoom can be optimized
+
+All curve parameters are passed when creating a room, even though not all of them are used.
+
+As such `Room` struct does not require `midPoint`, `maxPrice` for all curves, as well as floor and even steepness
+
+
+## [INFORMATIONAL-01] reentrancy possible in buyShares & sellShares
+
+Since `sharesSubject` is controlled by room creators, they can lead to reentrancy.
+
+**Recommendation:***
+
+Implement recommendations of finding [LOW-02].
+
+## [INFORMATIONAL-02] SimpsToken.sol does not exist
+
+this file is referenced in `test/Token.t.sol` but does not exist in git.
+
+
+## [INFORMATIONAL-03] getPriceOriginal is subset of getPriceQuadratic
 
 this function can be removed as it is simply quadratic curve with `steepness = 16000` and `floor = 0`
 
-
-notes:
-need to be careful as params have different meanings for different curves
-eg. steepness divided by 500 in liner settings a lower bound of 500 otherwise get division by 0
-
-
-an economic attack on a single curve will likely affect entire funds in the contract
-perhaps splitting the curves to different contracts or tracking each balance could limit such scenarios
-
-
-sell shares amount can be 0?
-
-
-if I can make sigmoid to return cheap price when buying share(s) at supply = 1 but high price when selling at supply > 1 it is potential win
