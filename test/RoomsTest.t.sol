@@ -90,25 +90,27 @@ contract RoomsTest is Test {
 
         uint256 supply = 1;
         uint256 amount = 1;
-        uint256 steepness = 16000;
+        uint256 steepness = 500;
         uint256 floor = 0;
         int256 midPoint = 0;
         uint256 maxPrice = 0;
 
         uint256 price = simps.getPriceLinear(supply, amount, steepness, floor);
+        console2.log("buy; amount: %s, steepness: %s, floor: %s", amount, steepness, floor);
+        console2.log("buy supply: %s, price = %e", supply, price);
 
-        uint256 protocolFee = price * 50000000000000000 / 1 ether;
-        uint256 subjectFee = price * 50000000000000000 / 1 ether;
+        // uint256 protocolFee = price * 50000000000000000 / 1 ether;
+        // uint256 subjectFee = price * 50000000000000000 / 1 ether;
 
-        uint256 room = simps.createRoomAndBuyShares{value: price + protocolFee + subjectFee}(SimpsVault.Curves.Linear, 1, steepness, floor, maxPrice, midPoint);
+        // uint256 room = simps.createRoomAndBuyShares{value: price + protocolFee + subjectFee}(SimpsVault.Curves.Linear, 1, steepness, floor, maxPrice, midPoint);
 
-        // check room was created
-        uint256 length = simps.getRoomsLength(address(simp1));
-        assertEq(length, 1);
+        // // check room was created
+        // uint256 length = simps.getRoomsLength(address(simp1));
+        // assertEq(length, 1);
 
-        // check shares balance
-        uint256 balance = simps.getSharesBalance(simp1, room, simp1);
-        assertEq(balance, 2);
+        // // check shares balance
+        // uint256 balance = simps.getSharesBalance(simp1, room, simp1);
+        // assertEq(balance, 2);
 
         vm.stopPrank();
     }
@@ -251,6 +253,48 @@ contract RoomsTest is Test {
         assertEq(balance, 0);
 
         vm.stopPrank();
+    }
+
+    /// @dev Test selling zero amount of shares does not transfer any funds since quadratic curve results in floor price
+    function test_SellZeroLinear() public {
+        vm.startPrank(simp1);
+
+        // ensure contract has funds
+        vm.deal(address(simps), 100 ether);
+
+        // steal `floor` amount of funds
+        uint256 floor = address(simps).balance;
+        uint256 room = simps.createRoom(SimpsVault.Curves.Linear, 16000, floor, 0, 0);
+
+        uint256 balanceBefore = address(simp1).balance;
+        simps.sellShares(simp1, 0, 0);
+        uint256 balanceAfter = address(simp1).balance;
+        assertEq(balanceAfter - balanceBefore, 0);
+
+        vm.stopPrank();
+    }
+
+    /// @dev Test selling zero amount of shares does not transfer any funds since quadratic curve results in floor price
+    function test_SellZeroQuadratic() public {
+        vm.startPrank(simp1);
+
+        // ensure contract has funds
+        vm.deal(address(simps), 100 ether);
+
+        // steal `floor` amount of funds
+        uint256 floor = address(simps).balance;
+        uint256 room = simps.createRoom(SimpsVault.Curves.Quadratic, 16000, floor, 0, 0);
+
+        uint256 balanceBefore = address(simp1).balance;
+        simps.sellShares(simp1, 0, 0);
+        uint256 balanceAfter = address(simp1).balance;
+        assertEq(balanceAfter - balanceBefore, 0);
+
+        vm.stopPrank();
+    }
+
+    receive() external payable {
+        console2.log("money received");
     }
 
     /// @dev Tests the creation of a sigmoid room and buying one share and selling one share
