@@ -7,8 +7,6 @@ import "openzeppelin-contracts-upgradeable/contracts/access/OwnableUpgradeable.s
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/Initializable.sol";
 import "openzeppelin-contracts-upgradeable/contracts/proxy/utils/UUPSUpgradeable.sol";
 
-import "forge-std/console.sol";
-
 /**
  * @title Simps
  * @dev A contract for creating and managing rooms for trading shares with various curves.
@@ -197,7 +195,7 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @param midPoint The mid point of the sigmoid curve.
      * @return price The total price for the shares.
      */
-function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public pure returns (uint256 price) {
+    function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public pure returns (uint256 price) {
         int256 numerator = int256(supply + amount) - midPoint;
         int256 innerSqrt = (int256(steepness) + (numerator)**2);
         int256 fixedInner = innerSqrt.toFixed();
@@ -374,11 +372,10 @@ function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint
 
         emit Trade(msg.sender, sharesSubject, false, amount, price, protocolFee, subjectFee, supply - amount);
 
-        console.log("price: %s, protocolFee: %s, subjectFee: %s", price, protocolFee, subjectFee);
         (bool success1, ) = msg.sender.call{value: price - protocolFee - subjectFee}("");
         (bool success2, ) = protocolFeeDestination.call{value: protocolFee}("");
         (bool success3, ) = sharesSubject.call{value: subjectFee}("");
-        console.log("success1: %s, success2: %s, success3: %s", success1, success2, success3);
+
         require(success1 && success2 && success3, "Unable to send funds");
     }
 
