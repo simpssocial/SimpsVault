@@ -198,7 +198,6 @@ contract SimpsVault is Initializable, OwnableUpgradeable, UUPSUpgradeable {
      * @return price The total price for the shares.
      */
 function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint256 floor, uint256 maxPrice, int256 midPoint) public pure returns (uint256 price) {
-        uint256 total = 0;
         int256 numerator = int256(supply + amount) - midPoint;
         int256 innerSqrt = (int256(steepness) + (numerator)**2);
         int256 fixedInner = innerSqrt.toFixed();
@@ -207,8 +206,7 @@ function getPriceSigmoid(uint256 supply, uint256 amount, uint256 steepness, uint
         int256 midVal = fixedNumerator.divide(fixedDenominator) + FixedMath.fixed1();
         int256 fixedFinal = (int256(maxPrice) * 1_000_000) / 2 * midVal;
         int256 finalVal = fixedFinal / 1_000_000_000_000 ether;
-        total += uint256(finalVal) + floor;
-        return total;
+        return uint256(finalVal) + floor;
     }
 
     /**
